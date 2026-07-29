@@ -1,0 +1,50 @@
+# Fly.io config for the Verdict API + audit worker.
+# Change `app` to a name you pick (must be globally unique on Fly).
+app = "verdict-jonny"
+primary_region = "lhr"
+
+[build]
+  # Uses the Dockerfile in this directory.
+
+[env]
+  NODE_ENV = "production"
+  HOST = "0.0.0.0"
+  PORT = "8787"
+  DEV_MODE = "false"
+  FREE_AUDIT_CREDITS = "1"
+  # Both dirs live on the single mounted volume below → survive restarts.
+  DATA_DIR = "/data/state"
+  STORAGE_DIR = "/data/screens"
+  GEMINI_MODEL = "gemini-2.5-flash"
+  # Protects the free Gemini quota; raise/remove once on paid AI.
+  MAX_AUDITS_PER_DAY = "300"
+  WORKER_CONCURRENCY = "2"
+  TRUST_PROXY = "true"
+  PUBLIC_URL = "https://verdict-jonny.fly.dev"
+
+# Persistent disk — state + screenshots go here (see DATA_DIR/STORAGE_DIR).
+[mounts]
+  source = "verdict_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # Always-on (you're paying) → no cold starts. Set auto_stop_machines to
+  # "stop" if you'd rather save money and accept a wake delay.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # Chromium is memory-hungry. 2GB comfortably runs WORKER_CONCURRENCY=2.
+  # Drop to "1gb" only if you also set WORKER_CONCURRENCY=1.
+  memory = "2gb"
